@@ -48,6 +48,7 @@ canvas{display:block;width:100%;height:100%}
 .small{font-size:16px!important;padding:8px 26px!important}
 #room-badge{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:30;background:rgba(5,5,16,.8);border:1px solid #00f3ff;border-radius:20px;padding:5px 14px;font-size:13px;color:#00f3ff;white-space:nowrap}
 #room-badge b{direction:ltr;display:inline-block;letter-spacing:2px;color:#fff}
+.danger{color:#f05;border-color:#f05;box-shadow:0 0 20px rgba(255,0,85,.3)}.danger:hover,.danger:active{background:#f05;color:#050510}
 #room-copy{background:rgba(0,243,255,.12);border:1px solid #00f3ff;border-radius:12px;color:#00f3ff;font-size:12px;padding:2px 10px;margin-right:8px;cursor:pointer}
 #room-exit{background:none;border:0;color:#f05;font-size:15px;margin-right:8px;cursor:pointer}
 .overlay-screen.spec{background:rgba(5,5,16,.15);backdrop-filter:none;justify-content:flex-end;padding-bottom:calc(60px + env(safe-area-inset-bottom,0px));pointer-events:none}
@@ -80,7 +81,8 @@ canvas{display:block;width:100%;height:100%}
 
 <div id="pause-screen" class="overlay-screen hidden">
   <h1 class="game-title">متوقف مؤقتاً</h1>
-  <button class="neon-btn" id="resume-btn">استمرار</button>
+  <button class="neon-btn" id="resume-btn">▶ استمرار</button>
+  <button class="neon-btn small danger" id="exit-btn" style="margin-top:14px">🚪 خروج</button>
 </div>
 
 <div id="game-over-screen" class="overlay-screen hidden">
@@ -455,6 +457,19 @@ function endGame(){
   $('board').innerHTML='<li style="color:#00f3ff;margin-bottom:4px">🏅 أفضل النتائج</li>'+top.map((s,i)=>`<li>${i+1}. ${s}</li>`).join('');
   $('game-over-screen').classList.remove('hidden');renderShips();
 }
+let exitT=0;
+function exitToMenu(){
+  const b=$('exit-btn');
+  if(!exitT){b.innerText='متأكد؟ اضغط تاني';exitT=setTimeout(()=>{exitT=0;b.innerText='🚪 خروج'},3000);return}
+  clearTimeout(exitT);exitT=0;b.innerText='🚪 خروج';
+  gameActive=false;paused=false;
+  if(score>highScore){highScore=score;store.set('dama_space_highscore',score);hsEl.innerText=score}
+  $('pause-screen').classList.add('hidden');
+  if(room.on)room.me.update({st:'idle',msg:null}).catch(()=>{});
+  spectating=false;myBlood=null;myMsg='';$('chat-bar').classList.add('hidden');
+  renderShips();$('start-screen').classList.remove('hidden');
+  ctx.fillStyle='#050510';ctx.fillRect(0,0,canvas.width,canvas.height);
+}
 function togglePause(){
   if(!gameActive)return;
   paused=!paused;$('pause-screen').classList.toggle('hidden',!paused);
@@ -604,6 +619,8 @@ function gotPlayer(id,v){
   if(v.st==='play'){
     if(g.st!=='play'){g.x=px;g.y=py;g.blood=null;g.shots=[];g.msg=null}
     g.st='play';g.tx=px;g.ty=py;g.sh=v.sh|0;g.hp=v.hp==null?100:v.hp;g.sc=v.sc|0;g.sd=v.sd|0;
+  }else if(v.st==='idle'){
+    g.st='idle';g.blood=null;g.shots=[];g.msg=null;
   }else if(v.st==='dead'){
     if(g.st!=='dead'){g.st='dead';g.x=g.tx=px;g.y=g.ty=py;g.sc=v.sc|0;g.blood=makeBlood(px,py);if(!isNew){boom(px,py,'#c4001c',50);snd(120,.4,'sawtooth',.05,-60)}}
     if(v.msg&&v.mt!==g.lastMt){g.lastMt=v.mt;if(!isNew){g.msg=String(v.msg).slice(0,60);g.mt=gt+420;snd(700,.08,'sine',.03,200)}}
@@ -706,7 +723,7 @@ addEventListener('keydown',e=>{
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&gameActive&&!paused)togglePause()});
 $('start-btn').onclick=startGame;$('restart-btn').onclick=startGame;
-$('pause-btn').onclick=togglePause;$('resume-btn').onclick=togglePause;
+$('pause-btn').onclick=togglePause;$('resume-btn').onclick=togglePause;$('exit-btn').onclick=exitToMenu;
 bombBtn.onclick=useBomb;
 $('mute-btn').onclick=()=>{muted=!muted;store.set('dama_muted',muted);$('mute-btn').innerText=muted?'🔇':'🔊'};
 
