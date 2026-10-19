@@ -48,6 +48,7 @@ canvas{display:block;width:100%;height:100%}
 .small{font-size:16px!important;padding:8px 26px!important}
 #room-badge{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:30;background:rgba(5,5,16,.8);border:1px solid #00f3ff;border-radius:20px;padding:5px 14px;font-size:13px;color:#00f3ff;white-space:nowrap}
 #room-badge b{direction:ltr;display:inline-block;letter-spacing:2px;color:#fff}
+#room-copy{background:rgba(0,243,255,.12);border:1px solid #00f3ff;border-radius:12px;color:#00f3ff;font-size:12px;padding:2px 10px;margin-right:8px;cursor:pointer}
 #room-exit{background:none;border:0;color:#f05;font-size:15px;margin-right:8px;cursor:pointer}
 .overlay-screen.spec{background:rgba(5,5,16,.15);backdrop-filter:none;justify-content:flex-end;padding-bottom:calc(60px + env(safe-area-inset-bottom,0px));pointer-events:none}
 .overlay-screen.spec *{pointer-events:auto}.spec #board{display:none}.spec .game-title{font-size:30px}
@@ -96,7 +97,7 @@ canvas{display:block;width:100%;height:100%}
   <input class="txt" id="pname" maxlength="12" placeholder="اسمك">
   <button class="neon-btn small" id="create-btn">➕ إنشاء غرفة</button>
   <div class="or">— أو —</div>
-  <input class="txt" id="rcode" maxlength="5" placeholder="كود الغرفة" style="direction:ltr;text-transform:uppercase">
+  <input class="txt" id="rcode" maxlength="5" inputmode="numeric" pattern="[0-9]*" placeholder="كود الغرفة (5 أرقام)" style="direction:ltr">
   <button class="neon-btn small" id="join-btn">🚪 دخول</button>
   <p class="hint" id="room-msg"></p>
   <button class="neon-btn small" id="room-back" style="margin-top:8px">رجوع</button>
@@ -618,8 +619,14 @@ function listen(){
 function updBadge(){
   if(!room.on)return;
   const n=Object.keys(ghosts).length+1;
-  $('room-badge').innerHTML=`🌐 <b>${room.code}</b> · ${n} لاعب<button id="room-exit">✖</button>`;
+  $('room-badge').innerHTML=`🌐 <b>${room.code}</b> · ${n} لاعب<button id="room-copy">📋 انسخه</button><button id="room-exit">✖</button>`;
   $('room-exit').onclick=()=>leaveRoom('خرجت من الغرفة');
+  $('room-copy').onclick=copyCode;
+}
+function copyCode(){
+  const t=room.code,b=$('room-copy'),ok=()=>{if(b)b.innerText='✓ اتنسخ'};
+  const old=()=>{const i=document.createElement('input');i.value=t;i.style.cssText='position:fixed;opacity:0;left:-99px';document.body.appendChild(i);i.select();try{document.execCommand('copy');ok()}catch(e){}i.remove()};
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(ok).catch(old);else old();
 }
 function msg(t){$('room-msg').innerText=t}
 function getName(){const n=$('pname').value.trim()||'لاعب'+Math.floor(Math.random()*90+10);store.set('dama_pname',n);return n}
@@ -662,8 +669,8 @@ async function createRoom(){
   msg('جاري الإنشاء...');
   try{
     await fbReady();room.name=getName();
-    for(let k=0;k<5;k++){
-      const code=Array.from({length:5},()=>'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*31)]).join('');
+    for(let k=0;k<12;k++){
+      const code=String(10000+Math.floor(Math.random()*90000));
       const meta=fbDb.ref('rooms/'+code+'/meta');
       if((await meta.once('value')).exists())continue;
       try{await meta.set({host:room.id,created:firebase.database.ServerValue.TIMESTAMP})}catch(e){continue}
@@ -673,8 +680,8 @@ async function createRoom(){
   }catch(e){msg(fbErr(e))}
 }
 async function joinRoom(){
-  const code=$('rcode').value.trim().toUpperCase();
-  if(!/^[A-Z0-9]{5}$/.test(code))return msg('الكود لازم 5 حروف/أرقام');
+  const code=$('rcode').value.trim().replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  if(!/^\d{5}$/.test(code))return msg('الكود لازم 5 أرقام');
   msg('جاري الاتصال...');
   try{
     await fbReady();room.name=getName();
